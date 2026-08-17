@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PMIC SPMI PON 数据查询系统</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --link: #2980b9; --bg: #f0f2f5; --card: #fff; --text: #333; --border: #e1e4e8; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; line-height: 1.6; }
+        
+        /* 登录界面 */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44,62,80,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .login-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 350px; text-align: center; }
+        .login-box h2 { margin-bottom: 20px; color: var(--primary); }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 14px; }
+        .login-box button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        .login-box button:hover { background: #2980b9; }
+        .login-error { color: #e74c3c; font-size: 12px; margin-top: 5px; height: 15px; }
+
+        /* 顶部与搜索 */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto 20px; }
+        .user-info { font-size: 14px; color: #666; display: flex; align-items: center; gap: 15px; }
+        .logout-btn { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        h1 { text-align: center; color: var(--primary); margin-bottom: 10px; font-weight: 300; letter-spacing: 1px; }
+        .search-container { max-width: 600px; margin: 0 auto 30px; }
+        .search-container input { width: 100%; padding: 15px 20px; font-size: 16px; border: 1px solid var(--border); border-radius: 30px; outline: none; box-sizing: border-box; }
+        .search-container input:focus { border-color: var(--accent); }
+
+        /* 导航与内容 */
+        .nav-container { text-align: center; margin-bottom: 30px; }
+        .nav-btn { background: var(--card); color: var(--primary); border: 1px solid var(--accent); padding: 10px 25px; margin: 0 8px; font-size: 16px; cursor: pointer; border-radius: 25px; transition: all 0.3s; font-weight: 500; }
+        .nav-btn:hover, .nav-btn.active { background: var(--accent); color: white; transform: translateY(-2px); box-shadow: 0 4px 6px rgba(50,50,93,0.11); }
+        .content-wrapper { max-width: 1400px; margin: 0 auto; }
+        .section-title { color: var(--primary); border-left: 5px solid var(--accent); padding-left: 15px; margin: 40px 0 20px; font-size: 1.4em; font-weight: 600; }
+        .card { background: var(--card); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); padding: 20px; margin-bottom: 30px; overflow-x: auto; }
+        
+        /* 表格 */
+        table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 400px; }
+        th { background: #f8f9fa; color: var(--primary); font-weight: 600; text-align: left; padding: 12px 15px; border-bottom: 2px solid var(--border); }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); color: #555; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f1f7fb; color: var(--primary); }
+        .pmic-tag { display: inline-block; background: var(--accent); color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; margin-right: 10px; }
+        a.doc-link { color: var(--link); text-decoration: none; font-size: 0.9em; margin-left: 8px; opacity: 0.7; }
+        a.doc-link:hover { opacity: 1; text-decoration: underline; }
+        .no-result { text-align: center; padding: 40px; color: #999; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <!-- 登录界面 -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>系统登录</h2>
+            <input type="text" id="username" placeholder="请输入账号" autocomplete="off">
+            <input type="password" id="password" placeholder="请输入密码">
+            <button onclick="handleLogin()">登 录</button>
+            <div class="login-error" id="login-error"></div>
+        </div>
+    </div>
+
+    <!-- 主界面 -->
+    <div id="main-app" style="display:none;">
+        <div class="top-bar">
+            <div class="user-info">
+                <span>👤 当前用户：<strong id="current-user"></strong></span>
+                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+            </div>
+        </div>
+
+        <h1>PMIC SPMI PON 数据查询系统</h1>
+
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="🔍 搜索 PMIC 型号或寄存器名称 (如: PMH0110, LDO01)..." oninput="handleSearch()">
+        </div>
+
+        <div class="nav-container">
+            <button class="nav-btn" onclick="switchTab('SM8750')">SM8750</button>
+            <button class="nav-btn" onclick="switchTab('SM8850')">SM8850</button>
+            <button class="nav-btn active" onclick="switchTab('SM8950')">SM8950</button>
+        </div>
+
+        <div class="content-wrapper" id="content-area"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. 登录与鉴权逻辑
+        // ==========================================
+        const validUsers = { "liangshuai": "123456", "shuai": "123456" };
+
+        function handleLogin() {
+            const user = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value;
+            const errorEl = document.getElementById('login-error');
+
+            if (validUsers[user] && validUsers[user] === pass) {
+                sessionStorage.setItem('loggedInUser', user);
+                showApp(user);
+            } else {
+                errorEl.innerText = '账号或密码错误，请重试';
+            }
+        }
+
+        function handleLogout() {
+            sessionStorage.removeItem('loggedInUser');
+            document.getElementById('main-app').style.display = 'none';
+            document.getElementById('login-overlay').style.display = 'flex';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('login-error').innerText = '';
+        }
+
+        function showApp(username) {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('current-user').innerText = username;
+            switchTab('SM8950');
+        }
+
+        window.onload = function() {
+            const user = sessionStorage.getItem('loggedInUser');
+            if (user && validUsers[user]) showApp(user);
+        };
+
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleLogin();
+        });
+
+        // ==========================================
+        // 2. 数据区域
+        // ==========================================
+        const db = {
+            "SM8950": {
+                pmicList: [
+                    { pmic: "PMK8850", id: "PMIC_A_E0", bus: "0", slave: "0x0", link: "#" },
+                    { pmic: "PMH0101", id: "PMIC_B_E0", bus: "0", slave: "0x1", link: "#" },
+                    { pmic: "PMH0104", id: "PMIC_C_E0", bus: "0", slave: "0x2", link: "#" },
+                    { pmic: "PMH0110", id: "PMIC_D_E0", bus: "0", slave: "0x3", link: "#" },
+                    { pmic: "PMD802x", id: "PMIC_E_E1", bus: "1", slave: "0x4", link: "#" },
+                    { pmic: "PMH0110", id: "PMIC_F_E0", bus: "0", slave: "0x5", link: "#" },
+                    { pmic: "PMH0110", id: "PMIC_G_E0", bus: "0", slave: "0x6", link: "#" },
+                    { pmic: "PMIH010x", id: "PMIC_H_E1", bus: "1", slave: "0x7", link: "#" },
+                    { pmic: "PMH0110", id: "PMIC_I_E0", bus: "0", slave: "0x8", link: "#" },
+                    { pmic: "PMJ1110", id: "PMIC_J_E1", bus: "1", slave: "0x9", link: "#" },
+                    { pmic: "PMR735D", id: "PMIC_K_E1", bus: "1", slave: "0xA", link: "#" },
+                    { pmic: "PM8010", id: "PMIC_M_E1", bus: "1", slave: "0xC", link: "#" },
+                    { pmic: "PM8010", id: "PMIC_N_E1", bus: "1", slave: "0xD", link: "#" }
+                ],
+                registers: {
+                    "PMH0101": { link: "#", regs: [ {name:"LDO01", addr:"0x0000C100"}, {name:"LDO02", addr:"0x0000C200"}, {name:"LDO03", addr:"0x0000C300"}, {name:"LDO04", addr:"0x0000C400"}, {name:"LDO05", addr:"0x0000C500"}, {name:"LDO06", addr:"0x0000C600"}, {name:"LDO07", addr:"0x0000C700"}, {name:"LDO08", addr:"0x0000C800"}, {name:"LDO09", addr:"0x0000C900"}, {name:"LDO10", addr:"0x0000CA00"}, {name:"LDO11", addr:"0x0000CB00"}, {name:"LDO12", addr:"0x0000CC00"}, {name:"LDO13", addr:"0x0000CD00"}, {name:"LDO14", addr:"0x0000CE00"}, {name:"LDO15", addr:"0x0000CF00"}, {name:"LDO16", addr:"0x0000D000"}, {name:"LDO17", addr:"0x0000D100"}, {name:"BOB1", addr:"0x0000E400"}, {name:"BOB2", addr:"0x0000E600"}, {name:"CBST", addr:"0x00009A00"} ] },
+                    "PMH0110": { link: "#", regs: [ {name:"LDO01", addr:"0x0000C100"}, {name:"LDO02", addr:"0x0000C200"}, {name:"LDO03", addr:"0x0000C300"}, {name:"LDO04", addr:"0x0000C400"}, {name:"S1", addr:"0x00009B00"}, {name:"S2", addr:"0x00009E00"}, {name:"S3", addr:"0x0000A100"}, {name:"S4", addr:"0x0000A400"}, {name:"S5", addr:"0x0000A700"}, {name:"S6", addr:"0x0000AA00"}, {name:"S7", addr:"0x0000AD00"}, {name:"S8", addr:"0x0000B000"}, {name:"S9", addr:"0x0000B300"}, {name:"S10", addr:"0x0000B600"}, {name:"GPIO01", addr:"0x00008800"}, {name:"GPIO02", addr:"0x00008900"}, {name:"GPIO03", addr:"0x00008A00"}, {name:"GPIO04", addr:"0x00008B00"}, {name:"GPIO05", addr:"0x00008C00"}, {name:"GPIO06", addr:"0x00008D00"}, {name:"GPIO07", addr:"0x00008E00"}, {name:"GPIO08", addr:"0x00008F00"}, {name:"GPIO09", addr:"0x00009000"}, {name:"GPIO10", addr:"0x00009100"}, {name:"GPIO11", addr:"0x00009200"}, {name:"GPIO12", addr:"0x00009300"}, {name:"GPIO13", addr:"0x00009400"}, {name:"GPIO14", addr:"0x00009500"} ] },
+                    "PMH0104": { link: "#", regs: [ {name:"S1", addr:"0x00009B00"}, {name:"S2", addr:"0x00009E00"}, {name:"S3", addr:"0x0000A100"}, {name:"S4", addr:"0x0000A400"}, {name:"GPIO01", addr:"0x00008800"}, {name:"GPIO02", addr:"0x00008900"}, {name:"GPIO03", addr:"0x00008A00"}, {name:"GPIO04", addr:"0x00008B00"}, {name:"GPIO05", addr:"0x00008C00"}, {name:"GPIO06", addr:"0x00008D00"}, {name:"GPIO07", addr:"0x00008E00"}, {name:"GPIO08", addr:"0x00008F00"} ] },
+                    "PMG1110": { link: "#", regs: [ {name:"S1", addr:"0x00009B00"}, {name:"S2", addr:"0x00009E00"}, {name:"GPIO01", addr:"0x00008800"}, {name:"GPIO02", addr:"0x00008900"}, {name:"GPIO03", addr:"0x00008A00"}, {name:"GPIO04", addr:"0x00008B00"} ] },
+                    "PM8010": { link: "#", regs: [ {name:"LDO01", addr:"0x00004000"}, {name:"LDO02", addr:"0x00004100"}, {name:"LDO03", addr:"0x00004200"}, {name:"LDO04", addr:"0x00004300"}, {name:"LDO05", addr:"0x00004400"}, {name:"LDO06", addr:"0x00004500"}, {name:"LDO07", addr:"0x00004600"} ] },
+                    "PMR735D": { link: "#", regs: [ {name:"LDO01", addr:"0x0000C100"}, {name:"LDO02", addr:"0x0000C200"}, {name:"LDO03", addr:"0x0000C300"}, {name:"LDO04", addr:"0x0000C400"}, {name:"LDO05", addr:"0x0000C500"}, {name:"LDO06", addr:"0x0000C600"}, {name:"LDO07", addr:"0x0000C700"}, {name:"GPIO1", addr:"0x00008800"}, {name:"GPIO2", addr:"0x00008900"} ] }
+                }
+            },
+            "SM8750": null,
+            "SM8850": null
+        };
+
+        // ==========================================
+        // 3. 渲染与搜索逻辑
+        // ==========================================
+        let currentSheet = 'SM8950';
+
+        function switchTab(sheetName) {
+            currentSheet = sheetName;
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if(btn.innerText === sheetName) btn.classList.add('active');
+            });
+            renderContent();
+        }
+
+        function handleSearch() {
+            renderContent();
+        }
+
+        function renderContent() {
+            const container = document.getElementById('content-area');
+            container.innerHTML = '';
+            const query = document.getElementById('search-input').value.trim().toLowerCase();
+            
+            const data = db[currentSheet];
+            if (!data) {
+                container.innerHTML = `<div class="no-result"><h3>${currentSheet} 数据暂未录入</h3></div>`;
+                return;
+            }
+
+            // 1. 过滤并渲染 PMIC 列表
+            let filteredList = data.pmicList;
+            if (query) {
+                filteredList = data.pmicList.filter(p => p.pmic.toLowerCase().includes(query) || p.id.toLowerCase().includes(query) || p.slave.toLowerCase().includes(query));
+            }
+
+            if (filteredList.length > 0) {
+                const listCard = document.createElement('div');
+                listCard.className = 'card';
+                let listHtml = `<div class="section-title">PMIC 标识符与总线信息</div><table><thead><tr><th>PMIC 型号</th><th>PMIC Identifier</th><th>BUS ID</th><th>Slave ID</th></tr></thead><tbody>`;
+                filteredList.forEach(row => {
+                    listHtml += `<tr>
+                        <td><strong>${row.pmic}</strong></td>
+                        <td><code>${row.id}</code> ${row.link && row.link !== '#' ? `<a href="${row.link}" target="_blank" class="doc-link" title="查看 Datasheet"><span class="link-icon">🔗</span></a>` : ''}</td>
+                        <td>${row.bus}</td>
+                        <td><span style="color:#d35400; font-family:monospace;">${row.slave}</span></td>
+                    </tr>`;
+                });
+                listHtml += `</tbody></table>`;
+                listCard.innerHTML = listHtml;
+                container.appendChild(listCard);
+            }
+
+            // 2. 过滤并渲染寄存器表
+            let hasRegs = false;
+            for (const [pmicName, pmicData] of Object.entries(data.registers)) {
+                let matchedRegs = pmicData.regs;
+                if (query) {
+                    if (pmicName.toLowerCase().includes(query)) {
+                        matchedRegs = pmicData.regs; // PMIC名匹配则显示全部
+                    } else {
+                        matchedRegs = pmicData.regs.filter(r => r.name.toLowerCase().includes(query) || r.addr.toLowerCase().includes(query));
+                    }
+                }
+                
+                if (matchedRegs.length > 0) {
+                    hasRegs = true;
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    let tableHtml = `<div style="margin-bottom:15px; display:flex; align-items:center;">
+                        <span class="pmic-tag">${pmicName}</span>
+                        <span style="color:#7f8c8d; font-size:0.9em;">Base Address Map</span>
+                        ${pmicData.link && pmicData.link !== '#' ? `<a href="${pmicData.link}" target="_blank" class="doc-link" title="查看寄存器手册"><span class="link-icon">🔗</span> 文档链接</a>` : ''}
+                    </div>
+                    <table><thead><tr><th style="width:30%;">模块名称</th><th style="width:70%;">Base Address</th></tr></thead><tbody>`;
+                    
+                    matchedRegs.forEach(r => {
+                        tableHtml += `<tr><td>${r.name}</td><td style="font-family:monospace; color:#2980b9; font-weight:500;">${r.addr}</td></tr>`;
+                    });
+                    tableHtml += `</tbody></table>`;
+                    card.innerHTML = tableHtml;
+                    container.appendChild(card);
+                }
+            }
+
+            // 3. 无结果提示
+            if (!hasRegs && filteredList.length === 0 && query) {
+                container.innerHTML += `<div class="no-result">未找到与 "<strong>${query}</strong>" 匹配的结果</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
+
+
