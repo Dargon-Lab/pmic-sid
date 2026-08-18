@@ -3,55 +3,560 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PMIC SPMI PON 数据查询系统</title>
+    <title>Qualcomm PMIC SID数据查询</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --link: #2980b9; --bg: #f0f2f5; --card: #fff; --text: #333; --border: #e1e4e8; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; line-height: 1.6; }
-        
-        /* 登录界面 */
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44,62,80,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .login-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 350px; text-align: center; }
-        .login-box h2 { margin-bottom: 20px; color: var(--primary); }
-        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 14px; }
-        .login-box button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px; }
-        .login-box button:hover { background: #2980b9; }
-        .login-error { color: #e74c3c; font-size: 12px; margin-top: 5px; height: 15px; }
+        /* ========================================
+                   1. 全局样式与CSS变量
+                   ======================================== */
+        :root {
+            --primary: #1a2639; /* 主色调：深蓝黑 */
+            --primary-light: #2c3e50;
+            --accent: #3b82f6; /* 强调色：亮蓝 */
+            --accent-hover: #2563eb;
+            --bg: #f1f5f9; /* 页面背景：浅灰蓝 */
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            --radius: 12px;
+            --radius-sm: 6px;
+            --transition: 0.25s ease;
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+        }
 
-        /* 顶部与搜索 */
-        .top-bar { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto 20px; }
-        .user-info { font-size: 14px; color: #666; display: flex; align-items: center; gap: 15px; }
-        .logout-btn { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-        h1 { text-align: center; color: var(--primary); margin-bottom: 10px; font-weight: 300; letter-spacing: 1px; }
-        .search-container { max-width: 600px; margin: 0 auto 30px; }
-        .search-container input { width: 100%; padding: 15px 20px; font-size: 16px; border: 1px solid var(--border); border-radius: 30px; outline: none; box-sizing: border-box; }
-        .search-container input:focus { border-color: var(--accent); }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-        /* 导航与内容 */
-        .nav-container { text-align: center; margin-bottom: 30px; }
-        .nav-btn { background: var(--card); color: var(--primary); border: 1px solid var(--accent); padding: 10px 25px; margin: 0 8px; font-size: 16px; cursor: pointer; border-radius: 25px; transition: all 0.3s; font-weight: 500; }
-        .nav-btn:hover, .nav-btn.active { background: var(--accent); color: white; transform: translateY(-2px); box-shadow: 0 4px 6px rgba(50,50,93,0.11); }
-        .content-wrapper { max-width: 1400px; margin: 0 auto; }
-        .section-title { color: var(--primary); border-left: 5px solid var(--accent); padding-left: 15px; margin: 40px 0 20px; font-size: 1.4em; font-weight: 600; }
-        .card { background: var(--card); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); padding: 20px; margin-bottom: 30px; overflow-x: auto; }
-        
-        /* 表格 */
-        table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 400px; }
-        th { background: #f8f9fa; color: var(--primary); font-weight: 600; text-align: left; padding: 12px 15px; border-bottom: 2px solid var(--border); }
-        td { padding: 12px 15px; border-bottom: 1px solid var(--border); color: #555; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #f1f7fb; color: var(--primary); }
-        .pmic-tag { display: inline-block; background: var(--accent); color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; margin-right: 10px; }
-        a.doc-link { color: var(--link); text-decoration: none; font-size: 0.9em; margin-left: 8px; opacity: 0.7; }
-        a.doc-link:hover { opacity: 1; text-decoration: underline; }
-        .no-result { text-align: center; padding: 40px; color: #999; font-size: 16px; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px 20px;
+            line-height: 1.6;
+        }
+
+        /* ========================================
+                   2. 登录界面
+                   ======================================== */
+        #login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 38, 57, 0.88);
+            backdrop-filter: blur(6px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .login-box {
+            background: var(--card);
+            padding: 44px 40px 36px;
+            border-radius: var(--radius);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+            width: 380px;
+            max-width: 92vw;
+            text-align: center;
+            animation: fadeUp 0.5s ease;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-box .logo-icon {
+            font-size: 42px;
+            margin-bottom: 4px;
+        }
+
+        .login-box h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .login-box .sub {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 13px 16px;
+            margin: 6px 0 12px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            background: #fafbfc;
+            transition: border-color var(--transition), box-shadow var(--transition);
+            box-sizing: border-box;
+        }
+
+        .login-box input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            background: #fff;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 13px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--transition), transform 0.15s;
+            margin-top: 8px;
+        }
+
+        .login-box button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .login-box button:active {
+            transform: translateY(0);
+        }
+
+        .login-error {
+            color: #ef4444;
+            font-size: 13px;
+            height: 20px;
+            margin-top: 6px;
+        }
+
+        /* ========================================
+                   3. 主界面布局
+                   ======================================== */
+        #main-app {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: none;
+            animation: fadeUp 0.4s ease;
+        }
+
+        /* ---- 顶部栏 ---- */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 14px 20px;
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 28px;
+        }
+
+        .top-bar .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .top-bar .brand span {
+            background: var(--accent);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 2px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.3px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .user-info strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background var(--transition), color var(--transition);
+        }
+
+        .logout-btn:hover {
+            background: #fecaca;
+            color: #b91c1c;
+        }
+
+        /* ---- 页面标题 ---- */
+        .page-title {
+            text-align: center;
+            font-size: 26px;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .page-title strong {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .page-sub {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 28px;
+        }
+
+        /* ---- 导航标签 ---- */
+        .nav-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 32px;
+        }
+
+        .nav-btn {
+            background: var(--card);
+            color: var(--text-muted);
+            border: 1.5px solid var(--border);
+            padding: 10px 30px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 30px;
+            transition: all var(--transition);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        }
+
+        .nav-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.12);
+        }
+
+        .nav-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .nav-btn.external {
+            background: transparent;
+            border-style: dashed;
+            color: var(--text-muted);
+        }
+
+        .nav-btn.external:hover {
+            border-color: #8b5cf6;
+            color: #8b5cf6;
+        }
+
+        /* ---- 内容区 ---- */
+        .content-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        /* ========================================
+                   4. 卡片与表格
+                   ======================================== */
+        .card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px 28px 28px;
+            overflow: hidden;
+            transition: box-shadow var(--transition);
+        }
+
+        .card:hover {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--bg);
+        }
+
+        .section-title .badge {
+            background: var(--accent);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 0 12px;
+            border-radius: 20px;
+            line-height: 24px;
+        }
+
+        /* ---- 表格通用 ---- */
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            min-width: 480px;
+        }
+
+        th {
+            background: #f8fafc;
+            color: var(--primary);
+            font-weight: 600;
+            text-align: left;
+            padding: 12px 16px;
+            border-bottom: 2px solid var(--border);
+            font-size: 13px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 11px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            color: var(--text);
+            vertical-align: middle;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: #f8fafc;
+        }
+
+        /* ---- PMIC 列表表格 ---- */
+        .pmic-model {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .pmic-id {
+            font-family: "SF Mono", "Menlo", monospace;
+            font-size: 13px;
+			font-weight: 600;
+            background: #e0f2fe;
+            padding: 2px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            color: var(--primary-light);
+        }
+
+        .slave-id {
+            font-family: "SF Mono", "Menlo", monospace;
+            
+            color: #b45309;
+            background: #fffbeb;
+            padding: 2px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            font-size: 13px;
+			font-weight: 600;
+        }
+
+        .bus-id {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 2px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .doc-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 13px;
+            margin-left: 6px;
+            opacity: 0.7;
+            transition: opacity var(--transition);
+        }
+
+        .doc-link:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
+        /* ---- 寄存器表格 ---- */
+        .reg-pmic-header {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .pmic-tag {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .reg-addr {
+            font-family: "SF Mono", "Menlo", monospace;
+            color: #1e40af;
+            font-weight: 500;
+            background: #eff6ff;
+            padding: 2px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: inline-block;
+        }
+
+        .reg-name {
+            font-weight: 500;
+            color: var(--primary);
+        }
+
+        /* ---- 空状态 ---- */
+        .no-result {
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--text-muted);
+            font-size: 16px;
+        }
+
+        .no-result .icon {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        /* ========================================
+                   5. 响应式
+                   ======================================== */
+        @media (max-width: 768px) {
+            body {
+                padding: 16px 12px;
+            }
+
+            .top-bar {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+                padding: 16px;
+            }
+
+            .top-bar .brand {
+                justify-content: center;
+            }
+
+            .user-info {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .page-title {
+                font-size: 20px;
+            }
+
+            .card {
+                padding: 18px 16px 20px;
+            }
+
+            .nav-btn {
+                padding: 8px 20px;
+                font-size: 14px;
+            }
+
+            table {
+                font-size: 13px;
+                min-width: 360px;
+            }
+
+            th,
+            td {
+                padding: 10px 12px;
+            }
+
+            .login-box {
+                padding: 32px 24px 28px;
+                width: 94vw;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .nav-btn {
+                padding: 6px 14px;
+                font-size: 13px;
+            }
+
+            .pmic-id,
+            .slave-id,
+            .bus-id,
+            .reg-addr {
+                font-size: 12px;
+                padding: 1px 8px;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <!-- 登录界面 -->
+    <!-- ========================================
+    登录界面
+    ======================================== -->
     <div id="login-overlay">
         <div class="login-box">
-            <h2>系统登录</h2>
+            <div class="logo-icon">🔐</div>
+            <h2>PMIC 数据查询</h2>
+            <p class="sub">Qualcomm 电源管理芯片寄存器信息</p>
             <input type="text" id="username" placeholder="请输入账号" autocomplete="off">
             <input type="password" id="password" placeholder="请输入密码">
             <button onclick="handleLogin()">登 录</button>
@@ -59,36 +564,56 @@
         </div>
     </div>
 
-    <!-- 主界面 -->
-    <div id="main-app" style="display:none;">
-        <div class="top-bar">
+    <!-- ========================================
+    主界面
+    ======================================== -->
+    <div id="main-app">
+
+        <!-- 顶部栏 -->
+        <header class="top-bar">
+            <div class="brand">
+                ⚡ PMIC SID 查询
+                <span>v1.0</span>
+            </div>
             <div class="user-info">
                 <span>👤 当前用户：<strong id="current-user"></strong></span>
                 <button class="logout-btn" onclick="handleLogout()">退出登录</button>
             </div>
-        </div>
+        </header>
 
-        <h1>PMIC SPMI PON 数据查询系统</h1>
+        <!-- 标题 -->
+        <h1 class="page-title">Qualcomm <strong>PMIC</strong> SID 数据查询</h1>
+        <!-- <p class="page-sub">浏览 PMIC 标识符、总线地址及寄存器基地址</p> -->
 
-        <div class="search-container">
-            <input type="text" id="search-input" placeholder="🔍 搜索 PMIC 型号或寄存器名称 (如: PMH0110, LDO01)..." oninput="handleSearch()">
-        </div>
-
-        <div class="nav-container">
+        <!-- 导航标签 -->
+        <nav class="nav-container">
             <button class="nav-btn" onclick="switchTab('SM8750')">SM8750</button>
             <button class="nav-btn" onclick="switchTab('SM8850')">SM8850</button>
             <button class="nav-btn active" onclick="switchTab('SM8950')">SM8950</button>
-        </div>
+            <a href="https://dargon-lab.github.io/qc-ocp-check/" class="nav-btn" target="_blank">OCP-Check</a>
+        </nav>
 
+        <!-- 内容区域 -->
         <div class="content-wrapper" id="content-area"></div>
     </div>
 
+    <!-- ========================================
+    JavaScript 逻辑
+    ======================================== -->
     <script>
-        // ==========================================
-        // 1. 登录与鉴权逻辑
-        // ==========================================
-        const validUsers = { "liangshuai": "123456", "hanyuekun": "123456" };
+        /**
+         * =============================================
+         * 1. 登录与鉴权
+         * =============================================
+         * 使用 sessionStorage 保存登录状态，
+         * 支持 Enter 键快速登录。
+         */
+        const validUsers = {
+            "liangshuai": "123456",
+            "hanyuekun": "123456"
+        };
 
+        /** 处理登录按钮点击 */
         function handleLogin() {
             const user = document.getElementById('username').value.trim();
             const pass = document.getElementById('password').value;
@@ -102,6 +627,7 @@
             }
         }
 
+        /** 退出登录，清除 session 并回到登录界面 */
         function handleLogout() {
             sessionStorage.removeItem('loggedInUser');
             document.getElementById('main-app').style.display = 'none';
@@ -111,29 +637,43 @@
             document.getElementById('login-error').innerText = '';
         }
 
+        /** 显示主应用，并初始化当前用户信息 */
         function showApp(username) {
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('main-app').style.display = 'block';
             document.getElementById('current-user').innerText = username;
+            // 默认加载 SM8950 数据
             switchTab('SM8950');
         }
 
+        /** 页面加载时自动恢复登录状态 */
         window.onload = function() {
             const user = sessionStorage.getItem('loggedInUser');
-            if (user && validUsers[user]) showApp(user);
+            if (user && validUsers[user]) {
+                showApp(user);
+            }
         };
 
+        /** 密码框按 Enter 触发登录 */
         document.getElementById('password').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') handleLogin();
         });
 
-        // ==========================================
-        // 2. 数据区域
-        // ==========================================
+        /**
+         * =============================================
+         * 2. 数据仓库
+         * =============================================
+         * db 对象按芯片平台（SM8750 / SM8850 / SM8950）组织，
+         * 每个平台包含：
+         *   - pmicList : PMIC 标识符及总线信息
+         *   - registers: 各 PMIC 的寄存器列表（名称 + 基地址）
+         */
         const db = {
+
+            // -------- SM8950 --------
             "SM8950": {
                 pmicList: [
-                    { pmic: "PMK8850", id: "PMIC_A_E0", bus: "0", slave: "0x0", link: "#" },
+                    { pmic: "PMK8950", id: "PMIC_A_E0", bus: "0", slave: "0x0", link: "#" },
                     { pmic: "PMH0101", id: "PMIC_B_E0", bus: "0", slave: "0x1", link: "#" },
                     { pmic: "PMH0104", id: "PMIC_C_E0", bus: "0", slave: "0x2", link: "#" },
                     { pmic: "PMH0110", id: "PMIC_D_E0", bus: "0", slave: "0x3", link: "#" },
@@ -142,115 +682,359 @@
                     { pmic: "PMH0110", id: "PMIC_G_E0", bus: "0", slave: "0x6", link: "#" },
                     { pmic: "PMIH010x", id: "PMIC_H_E1", bus: "1", slave: "0x7", link: "#" },
                     { pmic: "PMH0110", id: "PMIC_I_E0", bus: "0", slave: "0x8", link: "#" },
-                    { pmic: "PMJ1110", id: "PMIC_J_E1", bus: "1", slave: "0x9", link: "#" },
+                    { pmic: "PMG1110", id: "PMIC_J_E1", bus: "1", slave: "0x9", link: "#" },
                     { pmic: "PMR735D", id: "PMIC_K_E1", bus: "1", slave: "0xA", link: "#" },
                     { pmic: "PM8010", id: "PMIC_M_E1", bus: "1", slave: "0xC", link: "#" },
                     { pmic: "PM8010", id: "PMIC_N_E1", bus: "1", slave: "0xD", link: "#" }
                 ],
                 registers: {
-                    "PMH0101": { link: "https://docs.qualcomm.com/doc/HRD-PMH0101-S1/topic/BUS.html", regs: [ {name:"LDO01", addr:"0x0000C100"}, {name:"LDO02", addr:"0x0000C200"}, {name:"LDO03", addr:"0x0000C300"}, {name:"LDO04", addr:"0x0000C400"}, {name:"LDO05", addr:"0x0000C500"}, {name:"LDO06", addr:"0x0000C600"}, {name:"LDO07", addr:"0x0000C700"}, {name:"LDO08", addr:"0x0000C800"}, {name:"LDO09", addr:"0x0000C900"}, {name:"LDO10", addr:"0x0000CA00"}, {name:"LDO11", addr:"0x0000CB00"}, {name:"LDO12", addr:"0x0000CC00"}, {name:"LDO13", addr:"0x0000CD00"}, {name:"LDO14", addr:"0x0000CE00"}, {name:"LDO15", addr:"0x0000CF00"}, {name:"LDO16", addr:"0x0000D000"}, {name:"LDO17", addr:"0x0000D100"}, {name:"BOB1", addr:"0x0000E400"}, {name:"BOB2", addr:"0x0000E600"}, {name:"CBST", addr:"0x00009A00"} ] },
-                    "PMH0110": { link: "https://docs.qualcomm.com/doc/HRD-PMH0110-S1/topic/BUS.html", regs: [ {name:"LDO01", addr:"0x0000C100"}, {name:"LDO02", addr:"0x0000C200"}, {name:"LDO03", addr:"0x0000C300"}, {name:"LDO04", addr:"0x0000C400"}, {name:"S1", addr:"0x00009B00"}, {name:"S2", addr:"0x00009E00"}, {name:"S3", addr:"0x0000A100"}, {name:"S4", addr:"0x0000A400"}, {name:"S5", addr:"0x0000A700"}, {name:"S6", addr:"0x0000AA00"}, {name:"S7", addr:"0x0000AD00"}, {name:"S8", addr:"0x0000B000"}, {name:"S9", addr:"0x0000B300"}, {name:"S10", addr:"0x0000B600"}, {name:"GPIO01", addr:"0x00008800"}, {name:"GPIO02", addr:"0x00008900"}, {name:"GPIO03", addr:"0x00008A00"}, {name:"GPIO04", addr:"0x00008B00"}, {name:"GPIO05", addr:"0x00008C00"}, {name:"GPIO06", addr:"0x00008D00"}, {name:"GPIO07", addr:"0x00008E00"}, {name:"GPIO08", addr:"0x00008F00"}, {name:"GPIO09", addr:"0x00009000"}, {name:"GPIO10", addr:"0x00009100"}, {name:"GPIO11", addr:"0x00009200"}, {name:"GPIO12", addr:"0x00009300"}, {name:"GPIO13", addr:"0x00009400"}, {name:"GPIO14", addr:"0x00009500"} ] },
-                    "PMH0104": { link: "https://docs.qualcomm.com/doc/HRD-PMH0104-S1/topic/SPMI.html", regs: [ {name:"S1", addr:"0x00009B00"}, {name:"S2", addr:"0x00009E00"}, {name:"S3", addr:"0x0000A100"}, {name:"S4", addr:"0x0000A400"}, {name:"GPIO01", addr:"0x00008800"}, {name:"GPIO02", addr:"0x00008900"}, {name:"GPIO03", addr:"0x00008A00"}, {name:"GPIO04", addr:"0x00008B00"}, {name:"GPIO05", addr:"0x00008C00"}, {name:"GPIO06", addr:"0x00008D00"}, {name:"GPIO07", addr:"0x00008E00"}, {name:"GPIO08", addr:"0x00008F00"} ] },
-                    "PMG1110": { link: "https://docs.qualcomm.com/doc/HRD-PMG1110-S/topic/BUS.html", regs: [ {name:"S1", addr:"0x00009B00"}, {name:"GPIO01", addr:"0x00008800"}, {name:"GPIO02", addr:"0x00008900"}, {name:"GPIO03", addr:"0x00008A00"}, {name:"GPIO04", addr:"0x00008B00"} ] },
-                    "PM8010": { link: "https://docs.qualcomm.com/doc/HRD-PM8010-S/topic/SPMI.html", regs: [ {name:"LDO01", addr:"0x00004000"}, {name:"LDO02", addr:"0x00004100"}, {name:"LDO03", addr:"0x00004200"}, {name:"LDO04", addr:"0x00004300"}, {name:"LDO05", addr:"0x00004400"}, {name:"LDO06", addr:"0x00004500"}, {name:"LDO07", addr:"0x00004600"} ] },
-                    "PMR735D": { link: "https://docs.qualcomm.com/doc/HRD-PMR735D-S/topic/", regs: [ {name:"LDO01", addr:"0x0000C100"}, {name:"LDO02", addr:"0x0000C200"}, {name:"LDO03", addr:"0x0000C300"}, {name:"LDO04", addr:"0x0000C400"}, {name:"LDO05", addr:"0x0000C500"}, {name:"LDO06", addr:"0x0000C600"}, {name:"LDO07", addr:"0x0000C700"}, {name:"GPIO1", addr:"0x00008800"}, {name:"GPIO2", addr:"0x00008900"} ] }
+                    "PMH0101": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMH0101-S1/topic/BUS.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "LDO04", addr: "0x0000C400" },
+                            { name: "LDO05", addr: "0x0000C500" }, { name: "LDO06", addr: "0x0000C600" },
+                            { name: "LDO07", addr: "0x0000C700" }, { name: "LDO08", addr: "0x0000C800" },
+                            { name: "LDO09", addr: "0x0000C900" }, { name: "LDO10", addr: "0x0000CA00" },
+                            { name: "LDO11", addr: "0x0000CB00" }, { name: "LDO12", addr: "0x0000CC00" },
+                            { name: "LDO13", addr: "0x0000CD00" }, { name: "LDO14", addr: "0x0000CE00" },
+                            { name: "LDO15", addr: "0x0000CF00" }, { name: "LDO16", addr: "0x0000D000" },
+                            { name: "LDO17", addr: "0x0000D100" }, { name: "BOB1", addr: "0x0000E400" },
+                            { name: "BOB2", addr: "0x0000E600" }, { name: "CBST", addr: "0x00009A00" }
+                        ]
+                    },
+                    "PMH0110": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMH0110-S1/topic/BUS.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "LDO04", addr: "0x0000C400" },
+                            { name: "S1", addr: "0x00009B00" }, { name: "S2", addr: "0x00009E00" },
+                            { name: "S3", addr: "0x0000A100" }, { name: "S4", addr: "0x0000A400" },
+                            { name: "S5", addr: "0x0000A700" }, { name: "S6", addr: "0x0000AA00" },
+                            { name: "S7", addr: "0x0000AD00" }, { name: "S8", addr: "0x0000B000" },
+                            { name: "S9", addr: "0x0000B300" }, { name: "S10", addr: "0x0000B600" }
+                        ]
+                    },
+                    "PMH0104": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMH0104-S1/topic/SPMI.html",
+                        regs: [
+                            { name: "S1", addr: "0x00009B00" }, { name: "S2", addr: "0x00009E00" },
+                            { name: "S3", addr: "0x0000A100" }, { name: "S4", addr: "0x0000A400" }
+                        ]
+                    },
+                    "PMG1110": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMG1110-S/topic/BUS.html",
+                        regs: [
+                            { name: "S1", addr: "0x00009B00" }
+                        ]
+                    },
+                    "PM8010": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PM8010-S/topic/SPMI.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x00004000" }, { name: "LDO02", addr: "0x00004100" },
+                            { name: "LDO03", addr: "0x00004200" }, { name: "LDO04", addr: "0x00004300" },
+                            { name: "LDO05", addr: "0x00004400" }, { name: "LDO06", addr: "0x00004500" },
+                            { name: "LDO07", addr: "0x00004600" }
+                        ]
+                    },
+                    "PMR735D": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMR735D-S/topic/",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "LDO04", addr: "0x0000C400" },
+                            { name: "LDO05", addr: "0x0000C500" }, { name: "LDO06", addr: "0x0000C600" },
+                            { name: "LDO07", addr: "0x0000C700" }
+                        ]
+                    }
                 }
             },
-            "SM8750": null,
-            "SM8850": null
+
+            // -------- SM8750 --------
+            "SM8750": {
+                pmicList: [
+                    { pmic: "PMK8750", id: "PMIC_A_E0", bus: "0", slave: "0x0", link: "#" },
+                    { pmic: "PM8550", id: "PMIC_B_E0", bus: "0", slave: "0x1", link: "#" },
+                    { pmic: "PM8550VE", id: "PMIC_D_E0", bus: "0", slave: "0x3", link: "#" },
+                    { pmic: "PMD802x", id: "PMIC_E_E0", bus: "0", slave: "0x4", link: "#" },
+                    { pmic: "PM8550VE", id: "PMIC_F_E0", bus: "0", slave: "0x5", link: "#" },
+                    { pmic: "PM8550VE", id: "PMIC_G_E0", bus: "0", slave: "0x6", link: "#" },
+                    { pmic: "PMIH010x", id: "PMIC_H_E0", bus: "0", slave: "0x7", link: "#" },
+                    { pmic: "PM8550VE", id: "PMIC_I_E0", bus: "0", slave: "0x8", link: "#" },
+                    { pmic: "PM8550VS", id: "PMIC_J_E0", bus: "0", slave: "0x9", link: "#" },
+                    { pmic: "PMR735D", id: "PMIC_K_E0", bus: "0", slave: "0xA", link: "#" },
+                    { pmic: "PM8010", id: "PMIC_M_E0", bus: "0", slave: "0xC", link: "#" },
+                    { pmic: "PM8010", id: "PMIC_N_E0", bus: "0", slave: "0xD", link: "#" }
+                ],
+                registers: {
+                    "PM8550": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PM8550-S/topic/BUS.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "LDO04", addr: "0x0000C400" },
+                            { name: "LDO05", addr: "0x0000C500" }, { name: "LDO06", addr: "0x0000C600" },
+                            { name: "LDO07", addr: "0x0000C700" }, { name: "LDO08", addr: "0x0000C800" },
+                            { name: "LDO09", addr: "0x0000C900" }, { name: "LDO10", addr: "0x0000CA00" },
+                            { name: "LDO11", addr: "0x0000CB00" }, { name: "LDO12", addr: "0x0000CC00" },
+                            { name: "LDO13", addr: "0x0000CD00" }, { name: "LDO14", addr: "0x0000CE00" },
+                            { name: "LDO15", addr: "0x0000CF00" }, { name: "LDO16", addr: "0x0000D000" },
+                            { name: "LDO17", addr: "0x0000D100" }, { name: "BOB1", addr: "0x0000E400" },
+                            { name: "BOB2", addr: "0x0000E600" }, { name: "CBST", addr: "0x00009800" }
+                        ]
+                    },
+                    "PM8550VE": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PM8550VE-S/topic/BUS.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "S1", addr: "0x00009B00" },
+                            { name: "S2", addr: "0x00009E00" }, { name: "S3", addr: "0x0000A100" },
+                            { name: "S4", addr: "0x0000A400" }, { name: "S5", addr: "0x0000A700" },
+                            { name: "S6", addr: "0x0000AA00" }, { name: "S7", addr: "0x0000AD00" },
+                            { name: "S8", addr: "0x0000B000" }
+                        ]
+                    },
+                    "PM8550VS": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PM8550VS-S/topic/BUS.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "S1", addr: "0x00009B00" },
+                            { name: "S2", addr: "0x00009E00" }, { name: "S3", addr: "0x0000A100" },
+                            { name: "S4", addr: "0x0000A400" }, { name: "S5", addr: "0x0000A700" },
+                            { name: "S6", addr: "0x0000AA00" }
+                        ]
+                    },
+                    "PM8010": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PM8010-S/topic/SPMI.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x00004000" }, { name: "LDO02", addr: "0x00004100" },
+                            { name: "LDO03", addr: "0x00004200" }, { name: "LDO04", addr: "0x00004300" },
+                            { name: "LDO05", addr: "0x00004400" }, { name: "LDO06", addr: "0x00004500" },
+                            { name: "LDO07", addr: "0x00004600" }
+                        ]
+                    },
+                    "PMR735D": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMR735D-S/topic/",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "LDO04", addr: "0x0000C400" },
+                            { name: "LDO05", addr: "0x0000C500" }, { name: "LDO06", addr: "0x0000C600" },
+                            { name: "LDO07", addr: "0x0000C700" }
+                        ]
+                    }
+                }
+            },
+
+            // -------- SM8850 --------
+            "SM8850": {
+                pmicList: [
+                    { pmic: "PMK8850", id: "PMIC_A_E0", bus: "0", slave: "0x0", link: "#" },
+                    { pmic: "PMH0101", id: "PMIC_B_E0", bus: "0", slave: "0x1", link: "#" },
+                    { pmic: "PMH0110", id: "PMIC_D_E0", bus: "0", slave: "0x3", link: "#" },
+                    { pmic: "PMD802x", id: "PMIC_E_E1", bus: "1", slave: "0x4", link: "#" },
+                    { pmic: "PMH0110", id: "PMIC_F_E0", bus: "0", slave: "0x5", link: "#" },
+                    { pmic: "PMH0110", id: "PMIC_G_E0", bus: "0", slave: "0x6", link: "#" },
+                    { pmic: "PMIH010x", id: "PMIC_H_E1", bus: "1", slave: "0x7", link: "#" },
+                    { pmic: "PMH0110", id: "PMIC_I_E0", bus: "0", slave: "0x8", link: "#" },
+                    { pmic: "PMH0104", id: "PMIC_J_E1", bus: "1", slave: "0x9", link: "#" },
+                    { pmic: "PMR735D", id: "PMIC_K_E1", bus: "1", slave: "0xA", link: "#" },
+                    { pmic: "PM8010", id: "PMIC_M_E1", bus: "1", slave: "0xC", link: "#" },
+                    { pmic: "PM8010", id: "PMIC_N_E1", bus: "1", slave: "0xD", link: "#" }
+                ],
+                registers: {
+                    "PMH0101": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMH0101-S1/topic/BUS.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "LDO04", addr: "0x0000C400" },
+                            { name: "LDO05", addr: "0x0000C500" }, { name: "LDO06", addr: "0x0000C600" },
+                            { name: "LDO07", addr: "0x0000C700" }, { name: "LDO08", addr: "0x0000C800" },
+                            { name: "LDO09", addr: "0x0000C900" }, { name: "LDO10", addr: "0x0000CA00" },
+                            { name: "LDO11", addr: "0x0000CB00" }, { name: "LDO12", addr: "0x0000CC00" },
+                            { name: "LDO13", addr: "0x0000CD00" }, { name: "LDO14", addr: "0x0000CE00" },
+                            { name: "LDO15", addr: "0x0000CF00" }, { name: "LDO16", addr: "0x0000D000" },
+                            { name: "LDO17", addr: "0x0000D100" }, { name: "BOB1", addr: "0x0000E400" },
+                            { name: "BOB2", addr: "0x0000E600" }, { name: "CBST", addr: "0x00009A00" }
+                        ]
+                    },
+                    "PMH0110": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMH0110-S1/topic/BUS.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "LDO04", addr: "0x0000C400" },
+                            { name: "S1", addr: "0x00009B00" }, { name: "S2", addr: "0x00009E00" },
+                            { name: "S3", addr: "0x0000A100" }, { name: "S4", addr: "0x0000A400" },
+                            { name: "S5", addr: "0x0000A700" }, { name: "S6", addr: "0x0000AA00" },
+                            { name: "S7", addr: "0x0000AD00" }, { name: "S8", addr: "0x0000B000" },
+                            { name: "S9", addr: "0x0000B300" }, { name: "S10", addr: "0x0000B600" }
+                        ]
+                    },
+                    "PMH0104": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMH0104-S1/topic/SPMI.html",
+                        regs: [
+                            { name: "S1", addr: "0x00009B00" }, { name: "S2", addr: "0x00009E00" },
+                            { name: "S3", addr: "0x0000A100" }, { name: "S4", addr: "0x0000A400" }
+                        ]
+                    },
+                    "PMG1110": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMG1110-S/topic/BUS.html",
+                        regs: [
+                            { name: "S1", addr: "0x00009B00" }
+                        ]
+                    },
+                    "PM8010": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PM8010-S/topic/SPMI.html",
+                        regs: [
+                            { name: "LDO01", addr: "0x00004000" }, { name: "LDO02", addr: "0x00004100" },
+                            { name: "LDO03", addr: "0x00004200" }, { name: "LDO04", addr: "0x00004300" },
+                            { name: "LDO05", addr: "0x00004400" }, { name: "LDO06", addr: "0x00004500" },
+                            { name: "LDO07", addr: "0x00004600" }
+                        ]
+                    },
+                    "PMR735D": {
+                        link: "https://docs.qualcomm.com/doc/HRD-PMR735D-S/topic/",
+                        regs: [
+                            { name: "LDO01", addr: "0x0000C100" }, { name: "LDO02", addr: "0x0000C200" },
+                            { name: "LDO03", addr: "0x0000C300" }, { name: "LDO04", addr: "0x0000C400" },
+                            { name: "LDO05", addr: "0x0000C500" }, { name: "LDO06", addr: "0x0000C600" },
+                            { name: "LDO07", addr: "0x0000C700" }
+                        ]
+                    }
+                }
+            }
         };
 
-        // ==========================================
-        // 3. 渲染与搜索逻辑
-        // ==========================================
+        /**
+         * =============================================
+         * 3. 渲染引擎
+         * =============================================
+         * 当前选中的芯片平台由 currentSheet 维护，
+         * switchTab() 切换平台并触发重绘，
+         * renderContent() 负责构建 DOM 并填充数据。
+         */
         let currentSheet = 'SM8950';
 
+        /** 切换芯片平台标签 */
         function switchTab(sheetName) {
             currentSheet = sheetName;
-            document.querySelectorAll('.nav-btn').forEach(btn => {
+            // 更新导航按钮激活状态
+            document.querySelectorAll('.nav-btn:not(.external)').forEach(btn => {
                 btn.classList.remove('active');
-                if(btn.innerText === sheetName) btn.classList.add('active');
+                if (btn.innerText === sheetName) btn.classList.add('active');
             });
             renderContent();
         }
 
-        function handleSearch() {
-            renderContent();
-        }
-
+        /** 渲染当前平台的全部数据（PMIC 列表 + 寄存器表格） */
         function renderContent() {
             const container = document.getElementById('content-area');
             container.innerHTML = '';
-            const query = document.getElementById('search-input').value.trim().toLowerCase();
-            
+
             const data = db[currentSheet];
             if (!data) {
-                container.innerHTML = `<div class="no-result"><h3>${currentSheet} 数据暂未录入</h3></div>`;
+                container.innerHTML = `
+                            <div class="no-result">
+                                <span class="icon">📭</span>
+                                <p>${currentSheet} 数据暂未录入</p>
+                            </div>`;
                 return;
             }
 
-            // 1. 过滤并渲染 PMIC 列表
-            let filteredList = data.pmicList;
-            if (query) {
-                filteredList = data.pmicList.filter(p => p.pmic.toLowerCase().includes(query) || p.id.toLowerCase().includes(query) || p.slave.toLowerCase().includes(query));
+            // ---------- 1) 渲染 PMIC 列表 ----------
+            const listCard = document.createElement('div');
+            listCard.className = 'card';
+
+            let listHtml = `
+                        <div class="section-title">
+                            📋 PMIC 标识符与总线信息
+                            <span class="badge">${data.pmicList.length} 个</span>
+                        </div>
+                        <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>PMIC 型号</th>
+                                    <th>PMIC Identifier</th>
+                                    <th>BUS ID</th>
+                                    <th>Slave ID</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+            data.pmicList.forEach(row => {
+                const linkIcon = row.link && row.link !== '#' ?
+                    `<a href="${row.link}" target="_blank" class="doc-link" title="查看 Datasheet">🔗 文档</a>` :
+                    '';
+                listHtml += `
+                            <tr>
+                                <td><span class="pmic-model">${row.pmic}</span></td>
+                                <td><span class="pmic-id">${row.id}</span> ${linkIcon}</td>
+                                <td><span class="bus-id">${row.bus}</span></td>
+                                <td><span class="slave-id">${row.slave}</span></td>
+                            </tr>`;
+            });
+
+            listHtml += `
+                            </tbody>
+                        </table>
+                        </div>`;
+            listCard.innerHTML = listHtml;
+            container.appendChild(listCard);
+
+            // ---------- 2) 渲染寄存器表格（按 PMIC 分组） ----------
+            const regEntries = Object.entries(data.registers);
+            if (regEntries.length === 0) {
+                container.innerHTML += `
+                            <div class="no-result">
+                                <span class="icon">📄</span>
+                                <p>该平台暂无寄存器数据</p>
+                            </div>`;
+                return;
             }
 
-            if (filteredList.length > 0) {
-                const listCard = document.createElement('div');
-                listCard.className = 'card';
-                let listHtml = `<div class="section-title">PMIC 标识符与总线信息</div><table><thead><tr><th>PMIC 型号</th><th>PMIC Identifier</th><th>BUS ID</th><th>Slave ID</th></tr></thead><tbody>`;
-                filteredList.forEach(row => {
-                    listHtml += `<tr>
-                        <td><strong>${row.pmic}</strong></td>
-                        <td><code>${row.id}</code> ${row.link && row.link !== '#' ? `<a href="${row.link}" target="_blank" class="doc-link" title="查看 Datasheet"><span class="link-icon">🔗</span></a>` : ''}</td>
-                        <td>${row.bus}</td>
-                        <td><span style="color:#d35400; font-family:monospace;">${row.slave}</span></td>
-                    </tr>`;
-                });
-                listHtml += `</tbody></table>`;
-                listCard.innerHTML = listHtml;
-                container.appendChild(listCard);
-            }
+            // 按 PMIC 名称排序，使输出有序
+            regEntries.sort((a, b) => a[0].localeCompare(b[0]));
 
-            // 2. 过滤并渲染寄存器表
-            let hasRegs = false;
-            for (const [pmicName, pmicData] of Object.entries(data.registers)) {
-                let matchedRegs = pmicData.regs;
-                if (query) {
-                    if (pmicName.toLowerCase().includes(query)) {
-                        matchedRegs = pmicData.regs; // PMIC名匹配则显示全部
-                    } else {
-                        matchedRegs = pmicData.regs.filter(r => r.name.toLowerCase().includes(query) || r.addr.toLowerCase().includes(query));
-                    }
+            for (const [pmicName, pmicData] of regEntries) {
+                const regs = pmicData.regs;
+                if (!regs || regs.length === 0) continue;
+
+                const card = document.createElement('div');
+                card.className = 'card';
+
+                let tableHtml = `
+                            <div class="reg-pmic-header">
+                                <span class="pmic-tag">${pmicName}</span>
+                                ${pmicData.link && pmicData.link !== '#' ?
+                                    `<a href="${pmicData.link}" target="_blank" class="doc-link" style="opacity:1;">📖 查看规格书</a>` :
+                                    ''}
+                                <span style="margin-left:auto;font-size:13px;color:var(--text-muted);">${regs.length} 个寄存器</span>
+                            </div>
+                            <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:35%;">模块名称</th>
+                                        <th style="width:65%;">基地址 (Base Address)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+
+                for (const r of regs) {
+                    tableHtml += `
+                                <tr>
+                                    <td><span class="reg-name">${r.name}</span></td>
+                                    <td><span class="reg-addr">${r.addr}</span></td>
+                                </tr>`;
                 }
-                
-                if (matchedRegs.length > 0) {
-                    hasRegs = true;
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    let tableHtml = `<div style="margin-bottom:15px; display:flex; align-items:center;">
-                        <span class="pmic-tag">${pmicName}</span>
 
-                        ${pmicData.link && pmicData.link !== '#' ? `<a href="${pmicData.link}" target="_blank" class="doc-link" title="查看寄存器手册"></span> 查看规格书</a>` : ''}
-                    </div>
-                    <table><thead><tr><th style="width:30%;">模块名称</th><th style="width:70%;">Base Address</th></tr></thead><tbody>`;
-                    
-                    matchedRegs.forEach(r => {
-                        tableHtml += `<tr><td>${r.name}</td><td style="font-family:monospace; color:#2980b9; font-weight:500;">${r.addr}</td></tr>`;
-                    });
-                    tableHtml += `</tbody></table>`;
-                    card.innerHTML = tableHtml;
-                    container.appendChild(card);
-                }
-            }
-
-            // 3. 无结果提示
-            if (!hasRegs && filteredList.length === 0 && query) {
-                container.innerHTML += `<div class="no-result">未找到与 "<strong>${query}</strong>" 匹配的结果</div>`;
+                tableHtml += `
+                                </tbody>
+                            </table>
+                            </div>`;
+                card.innerHTML = tableHtml;
+                container.appendChild(card);
             }
         }
     </script>
+
 </body>
 </html>
-
-
